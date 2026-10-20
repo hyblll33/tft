@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TFT 远程控制台</title>
+<style>
+  :root{
+    --bg:#0b0f14; --card:#151b23; --line:#233040; --text:#e6edf3; --dim:#8b98a5;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --acc:#58a6ff;
+    --c1:#9aa4b2; --c2:#3fb950; --c3:#58a6ff; --c4:#bc8cff; --c5:#e3b341;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+  header{position:sticky;top:0;z-index:9;background:rgba(11,15,20,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 14px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .grow{flex:1}
+  h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.5px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--bad);display:inline-block}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.wait{background:var(--warn)}
+  .pill{font-size:12px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  main{padding:14px;max-width:1100px;margin:0 auto}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  section>h2{font-size:13px;margin:0 0 12px;color:var(--dim);font-weight:600;letter-spacing:1px;text-transform:uppercase}
+  .verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px}
+  .vbox{background:#0f151c;border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+  .vbox .k{font-size:11px;color:var(--dim);margin-bottom:4px}
+  .vbox .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .vbox .u{font-size:12px;color:var(--dim);margin-left:2px}
+  .label{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;font-weight:600}
+  .l-ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.4)}
+  .l-warn{background:rgba(210,153,34,.15);color:var(--warn);border:1px solid rgba(210,153,34,.4)}
+  .l-bad{background:rgba(248,81,73,.15);color:var(--bad);border:1px solid rgba(248,81,73,.4)}
+  .l-dim{background:rgba(139,152,165,.12);color:var(--dim);border:1px solid var(--line)}
+  .opp{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .pcard{background:#0f151c;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .pcard.me{border-color:rgba(88,166,255,.55)}
+  .pcard.dead{opacity:.45}
+  .phead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .pname{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .php{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700}
+  .up{color:var(--ok)} .down{color:var(--bad)} .flat{color:var(--dim)}
+  .meta{font-size:12px;color:var(--dim);margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap}
+  .units{display:flex;flex-wrap:wrap;gap:5px;min-height:22px}
+  .u1{color:var(--c1);border-color:rgba(154,164,178,.35)}
+  .u2{color:var(--c2);border-color:rgba(63,185,80,.35)}
+  .u3{color:var(--c3);border-color:rgba(88,166,255,.35)}
+  .u4{color:var(--c4);border-color:rgba(188,140,255,.35)}
+  .u5{color:var(--c5);border-color:rgba(227,179,65,.45)}
+  .unit{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;background:#0b0f14;white-space:nowrap}
+  .hpbar{display:block;height:6px;background:#0b0f14;border-radius:3px;overflow:hidden;margin-top:8px;border:1px solid var(--line)}
+  .hpfill{display:block;height:100%;background:linear-gradient(90deg,#3fb950,#d29922);transition:width .4s}
+  .hpfill.low{background:linear-gradient(90deg,#f85149,#d29922)}
+  .ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;color:var(--dim)}
+  input[type=number],input[type=text]{background:#0b0f14;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:14px;width:100%}
+  input[type=range]{width:100%}
+  button{background:#1f6feb;border:0;color:#fff;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+  button:active{transform:scale(.98)}
+  button.ghost{background:#0b0f14;border:1px solid var(--line);color:var(--text)}
+  button.danger{background:#da3633}
+  .switch{display:flex;align-items:center;justify-content:space-between;background:#0f151c;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .sw{position:relative;width:46px;height:26px;flex:0 0 auto}
+  .sw input{display:none}
+  .sw span{position:absolute;inset:0;background:#30363d;border-radius:999px;transition:.2s;cursor:pointer}
+  .sw span:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .sw input:checked+span{background:var(--ok)}
+  .sw input:checked+span:before{transform:translateX(20px)}
+  .costs{display:flex;gap:6px;flex-wrap:wrap}
+  .costs label{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text);background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+  .costs input{accent-color:var(--acc)}
+  .log{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:10px;height:110px;overflow:auto;color:var(--dim);white-space:pre-wrap}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1f6feb;color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+
+  /* 登录遮罩 */
+  #gate{position:fixed;inset:0;z-index:100;background:radial-gradient(1200px 600px at 50% -10%,#16202b,#0b0f14);display:flex;align-items:center;justify-content:center;padding:20px}
+  #gate .box{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  #gate h2{margin:0 0 6px;font-size:18px}
+  #gate p{margin:0 0 16px;color:var(--dim);font-size:13px}
+  #roomInput{font-size:24px;letter-spacing:4px;text-align:center;font-variant-numeric:tabular-nums}
+  #gate button{width:100%;margin-top:12px;padding:12px}
+  #gate .err{color:var(--bad);font-size:12px;margin-top:10px;min-height:18px}
+  .hide{display:none!important}
+  @media(max-width:520px){main{padding:10px}section{padding:12px;border-radius:10px}}
+</style>
+</head>
+<body>
+
+<!-- 登录：输房间号 -->
+<div id="gate">
+  <div class="box">
+    <h2>连上外挂</h2>
+    <p>手机上的外挂会显示一个房间号，输进来就行。不用同一个 WiFi，能上网就能连。</p>
+    <input id="roomInput" type="text" inputmode="numeric" maxlength="9" placeholder="1234-5678" autocomplete="off">
+    <button id="joinBtn">连接</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<header class="hide" id="topbar">
+  <div class="row">
+    <h1>远程控制台</h1>
+    <span class="pill"><span id="dot" class="dot"></span> <span id="conn">连接中…</span></span>
+    <span class="grow"></span>
+    <span class="pill" id="roomPill">--</span>
+    <span class="pill" id="stage">--</span>
+  </div>
+</header>
+
+<main class="hide" id="main">
+  <section>
+    <h2>输赢判断</h2>
+    <div class="row" style="margin-bottom:12px">
+      <span id="verdictLabel" class="label l-dim">等待数据</span>
+      <span id="verdictHint" style="color:var(--dim);font-size:13px"></span>
+    </div>
+    <div class="verdict">
+      <div class="vbox"><div class="k">我的名次</div><div class="v" id="myRank">-</div></div>
+      <div class="vbox"><div class="k">前四概率</div><div class="v" id="top4">-</div><div class="u">%</div></div>
+      <div class="vbox"><div class="k">吃鸡概率</div><div class="v" id="top1">-</div><div class="u">%</div></div>
+      <div class="vbox"><div class="k">存活</div><div class="v" id="alive">-</div></div>
+      <div class="vbox"><div class="k">战力分</div><div class="v" id="score">-</div></div>
+      <div class="vbox"><div class="k">距第四</div><div class="v" id="gap">-</div><div class="u">血</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>对手棋子</h2>
+    <div class="opp" id="opponents"><div style="color:var(--dim)">等待数据…</div></div>
+  </section>
+
+  <section>
+    <h2>血量变化</h2>
+    <div id="hpList"><div style="color:var(--dim)">等待数据…</div></div>
+  </section>
+
+  <section>
+    <h2>控制</h2>
+    <div class="ctl">
+      <div class="switch">
+        <div><div style="font-weight:600">对手卡牌</div><div style="font-size:12px;color:var(--dim)">买断对手快三星的牌</div></div>
+        <label class="sw"><input type="checkbox" id="cardingOn"><span></span></label>
+      </div>
+      <div class="switch">
+        <div><div style="font-weight:600">自动购买</div><div style="font-size:12px;color:var(--dim)">真去点购买</div></div>
+        <label class="sw"><input type="checkbox" id="autoOn"><span></span></label>
+      </div>
+      <div class="switch">
+        <div><div style="font-weight:600">自动化总闸</div><div style="font-size:12px;color:var(--dim)">所有操作类指令总开关</div></div>
+        <label class="sw"><input type="checkbox" id="automOn"><span></span></label>
+      </div>
+    </div>
+
+    <div class="ctl" style="margin-top:12px">
+      <div class="field">
+        <label>阈值：对手已有几张才动手 <b id="thVal">6</b></label>
+        <input type="range" id="threshold" min="3" max="9" step="1" value="6">
+      </div>
+      <div class="field">
+        <label>保留金币 <b id="rgVal">20</b></label>
+        <input type="range" id="reserveGold" min="0" max="80" step="5" value="20">
+      </div>
+      <div class="field">
+        <label>自己最多持有 <b id="moVal">3</b> 张</label>
+        <input type="range" id="maxOwned" min="1" max="9" step="1" value="3">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:12px">
+      <label>卡哪些费用</label>
+      <div class="costs">
+        <label><input type="checkbox" class="cost" value="1" checked>1费</label>
+        <label><input type="checkbox" class="cost" value="2" checked>2费</label>
+        <label><input type="checkbox" class="cost" value="3" checked>3费</label>
+        <label><input type="checkbox" class="cost" value="4" checked>4费</label>
+        <label><input type="checkbox" class="cost" value="5" checked>5费</label>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="applyAll">应用全部</button>
+      <button class="danger ghost" id="allOff">全部关闭</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>高级</h2>
+    <div class="ctl">
+      <div class="field">
+        <label>方法名</label>
+        <input type="text" id="agentMethod" placeholder="shop.buy">
+      </div>
+      <div class="field">
+        <label>参数（JSON）</label>
+        <input type="text" id="agentParams" placeholder='{"probe":true,"keyword":"Shop"}'>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" id="sendAgent">发送</button>
+      <button class="ghost" id="probeBuy">探测购买方法</button>
+      <button class="ghost" id="disconnect">断开</button>
+    </div>
+    <div class="log" id="log" style="margin-top:12px">就绪</div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ---------------- 极简 MQTT over WebSocket ----------------
+  function MqttWS(url, clientId, onMsg, onState) {
+    this.url = url; this.clientId = clientId;
+    this.onMsg = onMsg; this.onState = onState;
+    this.ws = null; this.pid = 1; this.pingTimer = null; this.alive = false;
+  }
+  MqttWS.prototype._encLen = function(n){
+    var out = [];
+    do { var b = n % 128; n = Math.floor(n / 128); if (n > 0) b = b | 0x80; out.push(b); } while (n > 0);
+    return out;
+  };
+  MqttWS.prototype._encStr = function(s){
+    var b = new TextEncoder().encode(s);
+    return [ (b.length >> 8) & 0xFF, b.length & 0xFF ].concat(Array.from(b));
+  };
+  MqttWS.prototype._packet = function(type, body){
+    return new Uint8Array([type].concat(this._encLen(body.length), body));
+  };
+  MqttWS.prototype.connect = function(){
+    var self = this;
+    try { this.ws = new WebSocket(this.url, 'mqtt'); }
+    catch (e) { this.onState(false, 'WebSocket 创建失败'); return; }
+    this.ws.binaryType = 'arraybuffer';
+    this.ws.onopen = function(){
+      // CONNECT
+      var body = self._encStr('MQTT').concat([4, 0x02, 0, 60]).concat(self._encStr(self.clientId));
+      self.ws.send(self._packet(0x10, body));
+    };
+    this.ws.onmessage = function(ev){
+      var d = new Uint8Array(ev.data);
+      self._onData(d);
+    };
+    this.ws.onclose = function(){ self.alive = false; self.onState(false, '连接关闭'); };
+    this.ws.onerror = function(){ self.onState(false, '连接错误'); };
+  };
+  MqttWS.prototype._onData = function(d){
+    var off = 0;
+    while (off < d.length) {
+      var type = d[off++];
+      var mul = 1, len = 0, b;
+      do {
+        b = d[off++]; len += (b & 0x7F) * mul; mul *= 128;
+        if (mul > 128*128*128) return;
+      } while (b & 0x80);
+      var body = d.subarray(off, off + len);
+      off += len;
+      var t = type & 0xF0;
+      if (t === 0x20) { this.alive = true; this.onState(true, 'connack'); this._startPing(); }
+      else if (t === 0x30) {
+        var tl = (body[0] << 8) | body[1];
+        var topic = new TextDecoder().decode(body.subarray(2, 2 + tl));
+        var payload = new TextDecoder().decode(body.subarray(2 + tl));
+        this.onMsg(topic, payload);
+      }
+    }
+  };
+  MqttWS.prototype._startPing = function(){
+    var self = this;
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    this.pingTimer = setInterval(function(){
+      if (!self.ws || self.ws.readyState !== 1) return;
+      try { self.ws.send(self._packet(0xC0, [])); } catch (e) {}
+    }, 25000);
+  };
+  MqttWS.prototype.subscribe = function(topic){
+    if (!this.ws || this.ws.readyState !== 1) return;
+    var id = this.pid++; if (this.pid > 65535) this.pid = 1;
+    var body = [ (id >> 8) & 0xFF, id & 0xFF ].concat(this._encStr(topic), [0]);
+    this.ws.send(this._packet(0x82, body));
+  };
+  MqttWS.prototype.publish = function(topic, text){
+    if (!this.ws || this.ws.readyState !== 1) return false;
+    var body = this._encStr(topic).concat(Array.from(new TextEncoder().encode(text)));
+    this.ws.send(this._packet(0x30, body));
+    return true;
+  };
+  MqttWS.prototype.close = function(){
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    try { if (this.ws) { this.ws.send(this._packet(0xE0, [])); this.ws.close(); } } catch (e) {}
+  };
+
+  // ---------------- 页面逻辑 ----------------
+  var BROKERS = [
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt'
+  ];
+
+  var $ = function(id){ return document.getElementById(id); };
+  var logEl = $('log'), logLines = [];
+  function log(msg){
+    var t = new Date().toLocaleTimeString();
+    logLines.push('[' + t + '] ' + msg);
+    if (logLines.length > 60) logLines = logLines.slice(-60);
+    logEl.textContent = logLines.join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  var toastTimer = null;
+  function toast(msg){
+    var el = $('toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 1600);
+  }
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+    });
+  }
+
+  var room = '';
+  var mqtt = null;
+  var brokerIdx = 0;
+  var lastStateAt = 0;
+  var dirty = false;
+
+  function normRoom(v){
+    return (v || '').replace(/\D/g, '').slice(0, 8);
+  }
+
+  function connectRoom(r){
+    room = normRoom(r);
+    if (room.length !== 8) { $('gateErr').textContent = '房间号是 8 位数字'; return; }
+    $('gateErr').textContent = '';
+    $('joinBtn').textContent = '连接中…';
+    $('joinBtn').disabled = true;
+    log('房间 ' + room + '，正在连中转站…');
+    connectBroker(0);
+  }
+
+  function connectBroker(idx){
+    brokerIdx = idx;
+    var url = BROKERS[idx];
+    log('尝试 ' + url);
+    mqtt = new MqttWS(url, 'web-' + room + '-' + Math.floor(Math.random()*10000), onMsg, function(ok, reason){
+      if (ok) {
+        $('dot').className = 'dot on';
+        $('conn').textContent = '已连接';
+        $('gate').classList.add('hide');
+        $('topbar').classList.remove('hide');
+        $('main').classList.remove('hide');
+        $('roomPill').textContent = room.slice(0,4) + '-' + room.slice(4);
+        mqtt.subscribe('tft/' + room + '/state');
+        mqtt.subscribe('tft/' + room + '/ack');
+        // 打个招呼，确认手机在线
+        mqtt.publish('tft/' + room + '/cmd', JSON.stringify({cmd:'ping'}));
+        log('已连上 ' + url);
+        toast('已连接');
+      } else {
+        log('连接失败：' + reason);
+        $('dot').className = 'dot';
+        $('conn').textContent = '连接中…';
+        if (idx + 1 < BROKERS.length) {
+          setTimeout(function(){ connectBroker(idx + 1); }, 800);
+        } else {
+          $('gate').classList.remove('hide');
+          $('gateErr').textContent = '三个中转站都连不上，检查一下网络？';
+          $('joinBtn').textContent = '连接';
+          $('joinBtn').disabled = false;
+        }
+      }
+    });
+    mqtt.connect();
+  }
+
+  function onMsg(topic, payload){
+    if (topic === 'tft/' + room + '/state') {
+      lastStateAt = Date.now();
+      try { render(JSON.parse(payload)); } catch (e) { log('状态解析失败'); }
+    } else if (topic === 'tft/' + room + '/ack') {
+      log('回执 ' + payload);
+      try {
+        var j = JSON.parse(payload);
+        toast(j.ok ? '成功' : ('失败：' + (j.err || '')));
+      } catch (e) {}
+    }
+  }
+
+  function send(payload, label){
+    if (!mqtt || !mqtt.alive) { toast('还没连上'); return; }
+    var ok = mqtt.publish('tft/' + room + '/cmd', JSON.stringify(payload));
+    log((label || payload.cmd) + ' → ' + (ok ? '已发送' : '发送失败'));
+  }
+
+  function costMask(){
+    var m = 0;
+    var els = document.querySelectorAll('.cost');
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].checked) m |= (1 << (parseInt(els[i].value, 10) - 1));
+    }
+    return m;
+  }
+
+  function render(s){
+    $('stage').textContent = '阶段 ' + (s.stage || '--');
+    var v = s.verdict;
+    if (v) {
+      $('myRank').textContent = v.myRank;
+      $('top4').textContent = Math.round(v.top4 * 100);
+      $('top1').textContent = Math.round(v.top1 * 100);
+      $('alive').textContent = v.alive;
+      $('score').textContent = v.myScore;
+      $('gap').textContent = v.gapToTop4 > 0 ? '+' + v.gapToTop4 : v.gapToTop4;
+      var cls = v.label === '稳前四' ? 'l-ok' : (v.label === '五五开' ? 'l-warn' : (v.label === '已出局' ? 'l-dim' : 'l-bad'));
+      $('verdictLabel').className = 'label ' + cls;
+      $('verdictLabel').textContent = v.label;
+      $('verdictHint').textContent = v.hint || '';
+    }
+
+    var opp = s.opponents || [];
+    if (!opp.length) {
+      $('opponents').innerHTML = '<div style="color:var(--dim)">等待棋盘数据…</div>';
+      $('hpList').innerHTML = '<div style="color:var(--dim)">等待数据…</div>';
+    } else {
+      $('opponents').innerHTML = opp.map(function(p){
+        var d = p.deltaHp || 0;
+        var dCls = d > 0 ? 'up' : (d < 0 ? 'down' : 'flat');
+        var dTxt = d > 0 ? ' ▲' + d : (d < 0 ? ' ▼' + (-d) : '');
+        var units = (p.units || []).map(function(u){
+          var stars = '★'.repeat(Math.max(1, Math.min(3, u.star || 1)));
+          return '<span class="unit u' + (u.cost || 1) + '">' + esc(u.name) + ' ' + stars + '</span>';
+        }).join('');
+        return '<div class="pcard ' + (p.isMe ? 'me' : '') + (p.hp <= 0 ? ' dead' : '') + '">'
+          + '<div class="phead"><span class="pname">' + esc(p.name) + (p.isMe ? ' (我)' : '') + '</span>'
+          + '<span class="php ' + dCls + '">' + p.hp + dTxt + '</span></div>'
+          + '<div class="meta"><span>Lv' + p.level + '</span><span>' + p.gold + '金</span>'
+          + '<span>' + (p.units || []).length + ' 个棋子</span></div>'
+          + '<div class="units">' + (units || '<span style="color:var(--dim);font-size:12px">无数据</span>') + '</div>'
+          + '<div class="hpbar"><div class="hpfill ' + (p.hp <= 20 ? 'low' : '') + '" style="width:' + Math.max(0, Math.min(100, p.hp)) + '%"></div></div>'
+          + '</div>';
+      }).join('');
+
+      $('hpList').innerHTML = opp.map(function(p){
+        var d = p.deltaHp || 0;
+        var cls = d > 0 ? 'up' : (d < 0 ? 'down' : 'flat');
+        var txt = d > 0 ? '+' + d : (d < 0 ? String(d) : '±0');
+        return '<div class="row" style="padding:4px 0;border-bottom:1px solid var(--line)">'
+          + '<span style="width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.name) + '</span>'
+          + '<span style="width:60px;text-align:right;font-variant-numeric:tabular-nums">' + p.hp + '</span>'
+          + '<span class="' + cls + '" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">' + txt + '</span>'
+          + '<span style="flex:1"><span class="hpbar" style="margin:0"><span class="hpfill ' + (p.hp <= 20 ? 'low' : '') + '" style="width:' + Math.max(0, Math.min(100, p.hp)) + '%"></span></span></span>'
+          + '</div>';
+      }).join('');
+    }
+
+    var c = s.config;
+    if (c && !dirty) {
+      $('cardingOn').checked = !!c.cardingEnabled;
+      $('autoOn').checked = !!c.autoCarding;
+      $('automOn').checked = !!c.automation;
+      $('threshold').value = c.cardingThreshold; $('thVal').textContent = c.cardingThreshold;
+      $('reserveGold').value = c.cardingReserveGold; $('rgVal').textContent = c.cardingReserveGold;
+      $('maxOwned').value = c.cardingMaxOwned; $('moVal').textContent = c.cardingMaxOwned;
+      var els = document.querySelectorAll('.cost');
+      for (var i = 0; i < els.length; i++) {
+        els[i].checked = !!(c.cardingCostMask & (1 << (parseInt(els[i].value, 10) - 1)));
+      }
+    }
+  }
+
+  // ---------------- 事件 ----------------
+  $('roomInput').addEventListener('input', function(e){
+    var v = normRoom(e.target.value);
+    if (v.length > 4) v = v.slice(0,4) + '-' + v.slice(4);
+    e.target.value = v;
+  });
+  $('joinBtn').onclick = function(){ connectRoom($('roomInput').value); };
+  $('roomInput').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') connectRoom($('roomInput').value);
+  });
+
+  ['threshold','reserveGold','maxOwned'].forEach(function(id){
+    $(id).addEventListener('input', function(){
+      dirty = true;
+      $('thVal').textContent = $('threshold').value;
+      $('rgVal').textContent = $('reserveGold').value;
+      $('moVal').textContent = $('maxOwned').value;
+    });
+  });
+  var costEls = document.querySelectorAll('.cost');
+  for (var i = 0; i < costEls.length; i++) costEls[i].addEventListener('change', function(){ dirty = true; });
+
+  $('applyAll').onclick = function(){
+    dirty = false;
+    send({cmd:'carding', enabled: $('cardingOn').checked, threshold: parseInt($('threshold').value,10),
+          reserveGold: parseInt($('reserveGold').value,10), maxOwned: parseInt($('maxOwned').value,10),
+          costMask: costMask()}, '卡牌配置');
+    send({cmd:'auto', enabled: $('autoOn').checked}, '自动购买');
+    send({cmd:'automation', enabled: $('automOn').checked}, '自动化总闸');
+  };
+
+  $('allOff').onclick = function(){
+    $('cardingOn').checked = false; $('autoOn').checked = false; $('automOn').checked = false;
+    dirty = false;
+    send({cmd:'carding', enabled:false}, '关卡牌');
+    send({cmd:'auto', enabled:false}, '关自动');
+    send({cmd:'automation', enabled:false}, '关总闸');
+  };
+
+  $('sendAgent').onclick = function(){
+    var params = {};
+    try { params = JSON.parse($('agentParams').value || '{}'); }
+    catch (e) { toast('参数不是合法 JSON'); return; }
+    send({cmd:'agent', method: $('agentMethod').value.trim(), params: params}, '注入体');
+  };
+
+  $('probeBuy').onclick = function(){
+    send({cmd:'agent', method:'shop.buy', params:{probe:true, keyword:'Shop'}}, '探测购买');
+  };
+
+  $('disconnect').onclick = function(){
+    if (mqtt) mqtt.close();
+    mqtt = null;
+    $('gate').classList.remove('hide');
+    $('topbar').classList.add('hide');
+    $('main').classList.add('hide');
+    $('joinBtn').textContent = '连接';
+    $('joinBtn').disabled = false;
+    $('conn').textContent = '未连接';
+    $('dot').className = 'dot';
+  };
+
+  // 每 3 秒检查一次手机还在不在
+  setInterval(function(){
+    if (!room || !mqtt || !mqtt.alive) return;
+    if (lastStateAt > 0 && Date.now() - lastStateAt > 4000) {
+      $('conn').textContent = '手机没响应';
+      $('dot').className = 'dot wait';
+    } else if (lastStateAt > 0) {
+      $('conn').textContent = '已连接';
+      $('dot').className = 'dot on';
+    }
+  }, 3000);
+
+  log('就绪，输入手机上的房间号');
+
+  // 支持 ?room=48392017 直接连：固定链接 + 房间号 = 点开就连，不用手输
+  try {
+    var qp = new URLSearchParams(location.search);
+    var qr = normRoom(qp.get('room') || '');
+    if (qr.length === 8) {
+      $('roomInput').value = qr.slice(0, 4) + '-' + qr.slice(4);
+      log('检测到链接里的房间号 ' + qr + '，自动连接');
+      setTimeout(function () { connectRoom(qr); }, 300);
+    }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
